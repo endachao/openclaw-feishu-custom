@@ -19,6 +19,36 @@ function getClient(params: CredParams) {
   return new Lark.Client({ appId, appSecret });
 }
 
+function throwFeishuError(
+  res: { code?: number; msg?: string; log_id?: string; error?: { log_id?: string } },
+  fallbackMessage: string,
+  hint?: string,
+): never {
+  const parts = [res.msg || fallbackMessage];
+  if (res.code !== undefined) parts.push(`code=${res.code}`);
+  const logId = res.log_id || res.error?.log_id;
+  if (logId) parts.push(`log_id=${logId}`);
+  if (hint) parts.push(hint);
+  throw new Error(parts.join(" | "));
+}
+
+function rethrowFeishuException(error: any, fallbackMessage: string, hint?: string): never {
+  const data = error?.response?.data;
+  if (data && typeof data === "object") {
+    throwFeishuError(
+      {
+        code: data.code,
+        msg: data.msg,
+        log_id: data.log_id,
+        error: data.error,
+      },
+      fallbackMessage,
+      hint,
+    );
+  }
+  throw error;
+}
+
 async function createTable(
   client: Lark.Client,
   appToken: string,
@@ -51,7 +81,7 @@ async function createTable(
     res = await requestWithFlatBody();
   }
 
-  if (res.code !== 0) throw new Error(res.msg || "create table failed");
+  if (res.code !== 0) throwFeishuError(res, "create table failed");
 
   return {
     app_token: appToken,
@@ -186,6 +216,81 @@ const SearchRecordsSchema = Type.Object({
   page_size: Type.Optional(Type.Number({ description: "Page size (max 500)" })),
   page_token: Type.Optional(Type.String({ description: "Pagination token" })),
   automatic_fields: Type.Optional(Type.Boolean()),
+  app_id: Type.Optional(Type.String({ description: "Feishu app id (optional if env provided)" })),
+  app_secret: Type.Optional(
+    Type.String({ description: "Feishu app secret (optional if env provided)" }),
+  ),
+});
+
+const UpdateFieldSchema = Type.Object({
+  app_token: Type.String({ description: "Bitable app token" }),
+  table_id: Type.String({ description: "Bitable table id" }),
+  field_id: Type.String({ description: "Field id to update" }),
+  field_name: Type.String({ description: "Field name" }),
+  type: Type.Number({ description: "Field type number" }),
+  property: Type.Optional(Type.Record(Type.String(), Type.Any())),
+  description: Type.Optional(Type.Record(Type.String(), Type.Any())),
+  ui_type: Type.Optional(Type.String({ description: "Optional UI type" })),
+  app_id: Type.Optional(Type.String({ description: "Feishu app id (optional if env provided)" })),
+  app_secret: Type.Optional(
+    Type.String({ description: "Feishu app secret (optional if env provided)" }),
+  ),
+});
+
+const DeleteFieldSchema = Type.Object({
+  app_token: Type.String({ description: "Bitable app token" }),
+  table_id: Type.String({ description: "Bitable table id" }),
+  field_id: Type.String({ description: "Field id to delete" }),
+  app_id: Type.Optional(Type.String({ description: "Feishu app id (optional if env provided)" })),
+  app_secret: Type.Optional(
+    Type.String({ description: "Feishu app secret (optional if env provided)" }),
+  ),
+});
+
+const UpdateTableSchema = Type.Object({
+  app_token: Type.String({ description: "Bitable app token" }),
+  table_id: Type.String({ description: "Bitable table id" }),
+  name: Type.String({ description: "New table name" }),
+  app_id: Type.Optional(Type.String({ description: "Feishu app id (optional if env provided)" })),
+  app_secret: Type.Optional(
+    Type.String({ description: "Feishu app secret (optional if env provided)" }),
+  ),
+});
+
+const DeleteTableSchema = Type.Object({
+  app_token: Type.String({ description: "Bitable app token" }),
+  table_id: Type.String({ description: "Bitable table id" }),
+  app_id: Type.Optional(Type.String({ description: "Feishu app id (optional if env provided)" })),
+  app_secret: Type.Optional(
+    Type.String({ description: "Feishu app secret (optional if env provided)" }),
+  ),
+});
+
+const ListRoleMembersSchema = Type.Object({
+  app_token: Type.String({ description: "Bitable app token" }),
+  role_id: Type.String({ description: "Bitable custom role id" }),
+  page_size: Type.Optional(Type.Number({ description: "Page size" })),
+  page_token: Type.Optional(Type.String({ description: "Pagination token" })),
+  app_id: Type.Optional(Type.String({ description: "Feishu app id (optional if env provided)" })),
+  app_secret: Type.Optional(
+    Type.String({ description: "Feishu app secret (optional if env provided)" }),
+  ),
+});
+
+const RemoveAppRoleMemberSchema = Type.Object({
+  app_token: Type.String({ description: "Bitable app token" }),
+  role_id: Type.String({ description: "Bitable custom role id" }),
+  member_id: Type.String({ description: "Member id to remove" }),
+  member_id_type: Type.Optional(
+    Type.Union([
+      Type.Literal("open_id"),
+      Type.Literal("union_id"),
+      Type.Literal("user_id"),
+      Type.Literal("chat_id"),
+      Type.Literal("department_id"),
+      Type.Literal("open_department_id"),
+    ]),
+  ),
   app_id: Type.Optional(Type.String({ description: "Feishu app id (optional if env provided)" })),
   app_secret: Type.Optional(
     Type.String({ description: "Feishu app secret (optional if env provided)" }),
@@ -620,6 +725,169 @@ const plugin = {
 
     api.registerTool<{
       app_token: string;
+      table_id: string;
+      field_id: string;
+      field_name: string;
+      type: number;
+      property?: Record<string, unknown>;
+      description?: Record<string, unknown>;
+      ui_type?: string;
+      app_id?: string;
+      app_secret?: string;
+    }>({
+      name: "feishu_custom_bitable_update_field",
+      description: "Update a field in a Bitable table",
+      parameters: UpdateFieldSchema,
+      async execute(ctxOrParams: any, rawParams?: any) {
+        const params = (ctxOrParams && typeof ctxOrParams === "object" && "params" in ctxOrParams
+          ? (ctxOrParams as any).params
+          : (rawParams ?? ctxOrParams)) as {
+          app_token: string;
+          table_id: string;
+          field_id: string;
+          field_name: string;
+          type: number;
+          property?: Record<string, unknown>;
+          description?: Record<string, unknown>;
+          ui_type?: string;
+          app_id?: string;
+          app_secret?: string;
+        };
+        const client = getClient(params);
+        const res = await client.bitable.appTableField.update({
+          path: {
+            app_token: params.app_token,
+            table_id: params.table_id,
+            field_id: params.field_id,
+          },
+          data: {
+            field_name: params.field_name,
+            type: params.type,
+            ...(params.property && { property: params.property as Record<string, any> }),
+            ...(params.description && { description: params.description as Record<string, any> }),
+            ...(params.ui_type && { ui_type: params.ui_type as any }),
+          },
+        });
+        if (res.code !== 0) throw new Error(res.msg || "update field failed");
+        return {
+          app_token: params.app_token,
+          table_id: params.table_id,
+          field: res.data?.field,
+        };
+      },
+    });
+
+    api.registerTool<{
+      app_token: string;
+      table_id: string;
+      field_id: string;
+      app_id?: string;
+      app_secret?: string;
+    }>({
+      name: "feishu_custom_bitable_delete_field",
+      description: "Delete a field from a Bitable table",
+      parameters: DeleteFieldSchema,
+      async execute(ctxOrParams: any, rawParams?: any) {
+        const params = (ctxOrParams && typeof ctxOrParams === "object" && "params" in ctxOrParams
+          ? (ctxOrParams as any).params
+          : (rawParams ?? ctxOrParams)) as {
+          app_token: string;
+          table_id: string;
+          field_id: string;
+          app_id?: string;
+          app_secret?: string;
+        };
+        const client = getClient(params);
+        const res = await client.bitable.appTableField.delete({
+          path: {
+            app_token: params.app_token,
+            table_id: params.table_id,
+            field_id: params.field_id,
+          },
+        });
+        if (res.code !== 0) throw new Error(res.msg || "delete field failed");
+        return {
+          ok: res.data?.deleted ?? true,
+          app_token: params.app_token,
+          table_id: params.table_id,
+          field_id: res.data?.field_id || params.field_id,
+        };
+      },
+    });
+
+    api.registerTool<{
+      app_token: string;
+      table_id: string;
+      name: string;
+      app_id?: string;
+      app_secret?: string;
+    }>({
+      name: "feishu_custom_bitable_update_table",
+      description: "Rename a table in a Bitable app",
+      parameters: UpdateTableSchema,
+      async execute(ctxOrParams: any, rawParams?: any) {
+        const params = (ctxOrParams && typeof ctxOrParams === "object" && "params" in ctxOrParams
+          ? (ctxOrParams as any).params
+          : (rawParams ?? ctxOrParams)) as {
+          app_token: string;
+          table_id: string;
+          name: string;
+          app_id?: string;
+          app_secret?: string;
+        };
+        const client = getClient(params);
+        const res = await client.bitable.appTable.patch({
+          path: {
+            app_token: params.app_token,
+            table_id: params.table_id,
+          },
+          data: { name: params.name },
+        });
+        if (res.code !== 0) throw new Error(res.msg || "update table failed");
+        return {
+          app_token: params.app_token,
+          table_id: params.table_id,
+          name: res.data?.name || params.name,
+        };
+      },
+    });
+
+    api.registerTool<{
+      app_token: string;
+      table_id: string;
+      app_id?: string;
+      app_secret?: string;
+    }>({
+      name: "feishu_custom_bitable_delete_table",
+      description: "Delete a table from a Bitable app",
+      parameters: DeleteTableSchema,
+      async execute(ctxOrParams: any, rawParams?: any) {
+        const params = (ctxOrParams && typeof ctxOrParams === "object" && "params" in ctxOrParams
+          ? (ctxOrParams as any).params
+          : (rawParams ?? ctxOrParams)) as {
+          app_token: string;
+          table_id: string;
+          app_id?: string;
+          app_secret?: string;
+        };
+        const client = getClient(params);
+        const res = await client.bitable.appTable.delete({
+          path: {
+            app_token: params.app_token,
+            table_id: params.table_id,
+          },
+        });
+        if (res.code !== 0) throw new Error(res.msg || "delete table failed");
+        return {
+          ok: true,
+          app_token: params.app_token,
+          table_id: params.table_id,
+        };
+      },
+    });
+
+    api.registerTool<{
+      app_token: string;
       app_id?: string;
       app_secret?: string;
     }>({
@@ -635,17 +903,161 @@ const plugin = {
           app_secret?: string;
         };
         const client = getClient(params);
-        const res = await client.bitable.appRole.list({
-          path: { app_token: params.app_token },
-          params: { page_size: 30 },
-        });
-        if (res.code !== 0) throw new Error(res.msg || "list app roles failed");
-        const items = res.data?.items || [];
-        return {
-          app_token: params.app_token,
-          total: items.length,
-          roles: items.map((r: any) => ({ role_id: r.role_id, role_name: r.role_name })),
+        try {
+          const res = await client.bitable.appRole.list({
+            path: { app_token: params.app_token },
+            params: { page_size: 30 },
+          });
+          if (res.code !== 0) {
+            throwFeishuError(
+              res,
+              "list app roles failed",
+              "This API may require Feishu Bitable advanced permissions to be enabled for the app or tenant.",
+            );
+          }
+          const items = res.data?.items || [];
+          return {
+            app_token: params.app_token,
+            total: items.length,
+            roles: items.map((r: any) => ({ role_id: r.role_id, role_name: r.role_name })),
+          };
+        } catch (error) {
+          rethrowFeishuException(
+            error,
+            "list app roles failed",
+            "This API may require Feishu Bitable advanced permissions to be enabled for the app or tenant.",
+          );
+        }
+      },
+    });
+
+    api.registerTool<{
+      app_token: string;
+      role_id: string;
+      page_size?: number;
+      page_token?: string;
+      app_id?: string;
+      app_secret?: string;
+    }>({
+      name: "feishu_custom_bitable_list_role_members",
+      description: "List collaborators in a Bitable custom role",
+      parameters: ListRoleMembersSchema,
+      async execute(ctxOrParams: any, rawParams?: any) {
+        const params = (ctxOrParams && typeof ctxOrParams === "object" && "params" in ctxOrParams
+          ? (ctxOrParams as any).params
+          : (rawParams ?? ctxOrParams)) as {
+          app_token: string;
+          role_id: string;
+          page_size?: number;
+          page_token?: string;
+          app_id?: string;
+          app_secret?: string;
         };
+        const client = getClient(params);
+        try {
+          const res = await client.bitable.appRoleMember.list({
+            path: {
+              app_token: params.app_token,
+              role_id: params.role_id,
+            },
+            params: {
+              ...(params.page_size !== undefined && { page_size: params.page_size }),
+              ...(params.page_token && { page_token: params.page_token }),
+            },
+          });
+          if (res.code !== 0) {
+            throwFeishuError(
+              res,
+              "list role members failed",
+              "This API may require Feishu Bitable advanced permissions to be enabled for the app or tenant.",
+            );
+          }
+          const items = res.data?.items || [];
+          return {
+            app_token: params.app_token,
+            role_id: params.role_id,
+            total: res.data?.total ?? items.length,
+            has_more: res.data?.has_more ?? false,
+            page_token: res.data?.page_token,
+            members: items,
+          };
+        } catch (error) {
+          rethrowFeishuException(
+            error,
+            "list role members failed",
+            "This API may require Feishu Bitable advanced permissions to be enabled for the app or tenant.",
+          );
+        }
+      },
+    });
+
+    api.registerTool<{
+      app_token: string;
+      role_id: string;
+      member_id: string;
+      member_id_type?:
+        | "open_id"
+        | "union_id"
+        | "user_id"
+        | "chat_id"
+        | "department_id"
+        | "open_department_id";
+      app_id?: string;
+      app_secret?: string;
+    }>({
+      name: "feishu_custom_bitable_remove_role_member",
+      description: "Remove a collaborator from a Bitable custom role",
+      parameters: RemoveAppRoleMemberSchema,
+      async execute(ctxOrParams: any, rawParams?: any) {
+        const params = (ctxOrParams && typeof ctxOrParams === "object" && "params" in ctxOrParams
+          ? (ctxOrParams as any).params
+          : (rawParams ?? ctxOrParams)) as {
+          app_token: string;
+          role_id: string;
+          member_id: string;
+          member_id_type?:
+            | "open_id"
+            | "union_id"
+            | "user_id"
+            | "chat_id"
+            | "department_id"
+            | "open_department_id";
+          app_id?: string;
+          app_secret?: string;
+        };
+        const client = getClient(params);
+        try {
+          const res = await client.bitable.appRoleMember.delete({
+            path: {
+              app_token: params.app_token,
+              role_id: params.role_id,
+              member_id: params.member_id,
+            },
+            params: {
+              ...(params.member_id_type && { member_id_type: params.member_id_type }),
+            },
+          });
+          if (res.code !== 0) {
+            throwFeishuError(
+              res,
+              "remove role member failed",
+              "This API may require Feishu Bitable advanced permissions to be enabled for the app or tenant.",
+            );
+          }
+          return {
+            ok: true,
+            app_token: params.app_token,
+            role_id: params.role_id,
+            member_id: params.member_id,
+            member_id_type: params.member_id_type || "open_id",
+          };
+        } catch (error) {
+          rethrowFeishuException(
+            error,
+            "remove role member failed",
+            "This API may require Feishu Bitable advanced permissions to be enabled for the app or tenant.",
+          );
+        }
       },
     });
 
@@ -683,41 +1095,55 @@ const plugin = {
         };
         const client = getClient(params);
 
-        let tableRoles = params.table_roles;
-        if (!tableRoles || tableRoles.length === 0) {
-          const listRes = await client.bitable.appTable.list({
-            path: { app_token: params.app_token },
-            params: { page_size: 100 },
-          });
-          if (listRes.code !== 0) throw new Error(listRes.msg || "list app tables failed");
-          const items = listRes.data?.items || [];
-          if (!items.length) throw new Error("no tables found in app; cannot create role");
-          const defaultPerm = params.table_perm ?? 4;
-          tableRoles = items
-            .map((t: any) => t.table_id)
-            .filter(Boolean)
-            .map((tableId: string) => ({ table_id: tableId, table_perm: defaultPerm }));
-        }
+        try {
+          let tableRoles = params.table_roles;
+          if (!tableRoles || tableRoles.length === 0) {
+            const listRes = await client.bitable.appTable.list({
+              path: { app_token: params.app_token },
+              params: { page_size: 100 },
+            });
+            if (listRes.code !== 0) throwFeishuError(listRes, "list app tables failed");
+            const items = listRes.data?.items || [];
+            if (!items.length) throw new Error("no tables found in app; cannot create role");
+            const defaultPerm = params.table_perm ?? 4;
+            tableRoles = items
+              .map((t: any) => t.table_id)
+              .filter(Boolean)
+              .map((tableId: string) => ({ table_id: tableId, table_perm: defaultPerm }));
+          }
 
-        const res = await client.bitable.appRole.create({
-          path: { app_token: params.app_token },
-          data: {
-            role_name: params.role_name,
-            table_roles: tableRoles.map((t) => ({
-              table_id: t.table_id,
-              table_perm: t.table_perm,
-              ...(t.allow_add_record !== undefined && { allow_add_record: t.allow_add_record }),
-              ...(t.allow_delete_record !== undefined && { allow_delete_record: t.allow_delete_record }),
-            })),
-          },
-        });
-        if (res.code !== 0) throw new Error(res.msg || "create app role failed");
-        return {
-          app_token: params.app_token,
-          role_id: res.data?.role?.role_id,
-          role_name: res.data?.role?.role_name || params.role_name,
-          table_roles_count: res.data?.role?.table_roles?.length ?? tableRoles.length,
-        };
+          const res = await client.bitable.appRole.create({
+            path: { app_token: params.app_token },
+            data: {
+              role_name: params.role_name,
+              table_roles: tableRoles.map((t) => ({
+                table_id: t.table_id,
+                table_perm: t.table_perm,
+                ...(t.allow_add_record !== undefined && { allow_add_record: t.allow_add_record }),
+                ...(t.allow_delete_record !== undefined && { allow_delete_record: t.allow_delete_record }),
+              })),
+            },
+          });
+          if (res.code !== 0) {
+            throwFeishuError(
+              res,
+              "create app role failed",
+              "This API may require Feishu Bitable advanced permissions to be enabled for the app or tenant.",
+            );
+          }
+          return {
+            app_token: params.app_token,
+            role_id: res.data?.role?.role_id,
+            role_name: res.data?.role?.role_name || params.role_name,
+            table_roles_count: res.data?.role?.table_roles?.length ?? tableRoles.length,
+          };
+        } catch (error) {
+          rethrowFeishuException(
+            error,
+            "create app role failed",
+            "This API may require Feishu Bitable advanced permissions to be enabled for the app or tenant.",
+          );
+        }
       },
     });
 
@@ -756,26 +1182,40 @@ const plugin = {
           app_secret?: string;
         };
         const client = getClient(params);
-        const res = await client.bitable.appRoleMember.create({
-          path: {
+        try {
+          const res = await client.bitable.appRoleMember.create({
+            path: {
+              app_token: params.app_token,
+              role_id: params.role_id,
+            },
+            params: {
+              member_id_type: params.member_id_type || "open_id",
+            },
+            data: {
+              member_id: params.member_id,
+            },
+          });
+          if (res.code !== 0) {
+            throwFeishuError(
+              res,
+              "add role member failed",
+              "This API may require Feishu Bitable advanced permissions to be enabled for the app or tenant.",
+            );
+          }
+          return {
+            ok: true,
             app_token: params.app_token,
             role_id: params.role_id,
-          },
-          params: {
-            member_id_type: params.member_id_type || "open_id",
-          },
-          data: {
             member_id: params.member_id,
-          },
-        });
-        if (res.code !== 0) throw new Error(res.msg || "add role member failed");
-        return {
-          ok: true,
-          app_token: params.app_token,
-          role_id: params.role_id,
-          member_id: params.member_id,
-          member_id_type: params.member_id_type || "open_id",
-        };
+            member_id_type: params.member_id_type || "open_id",
+          };
+        } catch (error) {
+          rethrowFeishuException(
+            error,
+            "add role member failed",
+            "This API may require Feishu Bitable advanced permissions to be enabled for the app or tenant.",
+          );
+        }
       },
     });
 

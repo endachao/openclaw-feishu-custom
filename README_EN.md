@@ -23,6 +23,8 @@ This plugin fills those gaps using Feishu's Open API and runs alongside the offi
 | `feishu_custom_bitable_create_table` | Create a single table in an existing Bitable app with optional fields and views |
 | `feishu_custom_bitable_create_tables_batch` | Create multiple tables sequentially |
 | `feishu_custom_bitable_list_tables` | List tables in a Bitable app |
+| `feishu_custom_bitable_update_table` | Rename a table |
+| `feishu_custom_bitable_delete_table` | Delete a table |
 
 ### Roles & Permissions
 
@@ -41,6 +43,20 @@ This plugin fills those gaps using Feishu's Open API and runs alongside the offi
 | `feishu_custom_bitable_batch_create_records` | Create multiple records in one request |
 | `feishu_custom_bitable_batch_update_records` | Update multiple records in one request |
 | `feishu_custom_bitable_search_records` | Search records with structured filters |
+
+### Field Management
+
+| Tool | Description |
+|------|-------------|
+| `feishu_custom_bitable_update_field` | Update field configuration |
+| `feishu_custom_bitable_delete_field` | Delete a field |
+
+### Role Member Management
+
+| Tool | Description |
+|------|-------------|
+| `feishu_custom_bitable_list_role_members` | List collaborators in a custom role |
+| `feishu_custom_bitable_remove_role_member` | Remove a collaborator from a custom role |
 
 ## Installation
 
