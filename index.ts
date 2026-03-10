@@ -179,7 +179,7 @@ const PermAddMemberSchema = Type.Object({
 });
 
 const plugin = {
-  id: "feishu-custom",
+  id: "openclaw-feishu-custom",
   name: "Feishu Custom Tools",
   description: "Custom Feishu tools without overriding bundled feishu plugin",
   register(api: OpenClawPluginApi) {

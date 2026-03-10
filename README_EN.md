@@ -34,8 +34,33 @@ This plugin fills those gaps using Feishu's Open API and runs alongside the offi
 
 ## Installation
 
+### Option 1: Install directly from an OpenClaw chat
+
+If you are already using OpenClaw, send this message in chat:
+
+```text
+Help me install this extension: https://github.com/endachao/openclaw-feishu-custom
+```
+
+If the current session has installer capability enabled, OpenClaw can fetch and install the extension directly from GitHub.
+
+### Option 2: Install from GitHub via CLI
+
 ```bash
 openclaw plugins install https://github.com/endachao/openclaw-feishu-custom.git
+```
+
+### Option 3: Install from npm
+
+```bash
+openclaw plugins install openclaw-feishu-custom
+```
+
+### Option 4: Link a local checkout for development
+
+```bash
+git clone https://github.com/endachao/openclaw-feishu-custom.git
+openclaw plugins install --link ./openclaw-feishu-custom
 ```
 
 Then enable in your config:
@@ -44,13 +69,15 @@ Then enable in your config:
 {
   "plugins": {
     "entries": {
-      "feishu-custom": { "enabled": true }
+      "openclaw-feishu-custom": { "enabled": true }
     }
   }
 }
 ```
 
 > Keep the bundled `feishu` plugin enabled. This plugin is additive, not a replacement.
+
+After installation or config changes, reload OpenClaw config or restart the gateway so the plugin is picked up.
 
 ## Credentials
 
