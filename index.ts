@@ -94,6 +94,104 @@ const CreateTablesBatchSchema = Type.Object({
   ),
 });
 
+const ListTablesSchema = Type.Object({
+  app_token: Type.String({ description: "Bitable app token" }),
+  page_size: Type.Optional(Type.Number({ description: "Page size (max 100)" })),
+  page_token: Type.Optional(Type.String({ description: "Pagination token" })),
+  app_id: Type.Optional(Type.String({ description: "Feishu app id (optional if env provided)" })),
+  app_secret: Type.Optional(
+    Type.String({ description: "Feishu app secret (optional if env provided)" }),
+  ),
+});
+
+const DeleteRecordSchema = Type.Object({
+  app_token: Type.String({ description: "Bitable app token" }),
+  table_id: Type.String({ description: "Bitable table id" }),
+  record_id: Type.String({ description: "Record id to delete" }),
+  app_id: Type.Optional(Type.String({ description: "Feishu app id (optional if env provided)" })),
+  app_secret: Type.Optional(
+    Type.String({ description: "Feishu app secret (optional if env provided)" }),
+  ),
+});
+
+const BatchCreateRecordsSchema = Type.Object({
+  app_token: Type.String({ description: "Bitable app token" }),
+  table_id: Type.String({ description: "Bitable table id" }),
+  records: Type.Array(
+    Type.Object({
+      fields: Type.Record(Type.String(), Type.Any(), {
+        description: "Record fields keyed by field name",
+      }),
+    }),
+    { minItems: 1, description: "Records to create (max 500)" },
+  ),
+  user_id_type: Type.Optional(
+    Type.Union([Type.Literal("user_id"), Type.Literal("union_id"), Type.Literal("open_id")]),
+  ),
+  client_token: Type.Optional(Type.String({ description: "Optional idempotency token" })),
+  ignore_consistency_check: Type.Optional(Type.Boolean()),
+  app_id: Type.Optional(Type.String({ description: "Feishu app id (optional if env provided)" })),
+  app_secret: Type.Optional(
+    Type.String({ description: "Feishu app secret (optional if env provided)" }),
+  ),
+});
+
+const BatchUpdateRecordsSchema = Type.Object({
+  app_token: Type.String({ description: "Bitable app token" }),
+  table_id: Type.String({ description: "Bitable table id" }),
+  records: Type.Array(
+    Type.Object({
+      record_id: Type.String({ description: "Existing record id" }),
+      fields: Type.Record(Type.String(), Type.Any(), {
+        description: "Fields to update, keyed by field name",
+      }),
+    }),
+    { minItems: 1, description: "Records to update (max 500)" },
+  ),
+  user_id_type: Type.Optional(
+    Type.Union([Type.Literal("user_id"), Type.Literal("union_id"), Type.Literal("open_id")]),
+  ),
+  ignore_consistency_check: Type.Optional(Type.Boolean()),
+  app_id: Type.Optional(Type.String({ description: "Feishu app id (optional if env provided)" })),
+  app_secret: Type.Optional(
+    Type.String({ description: "Feishu app secret (optional if env provided)" }),
+  ),
+});
+
+const SearchRecordsSchema = Type.Object({
+  app_token: Type.String({ description: "Bitable app token" }),
+  table_id: Type.String({ description: "Bitable table id" }),
+  view_id: Type.Optional(Type.String({ description: "Optional view id to scope the search" })),
+  field_names: Type.Optional(
+    Type.Array(Type.String(), { description: "Optional field names to return" }),
+  ),
+  sort: Type.Optional(
+    Type.Array(
+      Type.Object({
+        field_name: Type.Optional(Type.String()),
+        desc: Type.Optional(Type.Boolean()),
+      }),
+      { description: "Sort rules" },
+    ),
+  ),
+  filter: Type.Optional(
+    Type.Any({
+      description:
+        "Feishu search filter object. Example: { conjunction: 'and', conditions: [{ field_name: '状态', operator: 'is', value: ['进行中'] }] }",
+    }),
+  ),
+  user_id_type: Type.Optional(
+    Type.Union([Type.Literal("user_id"), Type.Literal("union_id"), Type.Literal("open_id")]),
+  ),
+  page_size: Type.Optional(Type.Number({ description: "Page size (max 500)" })),
+  page_token: Type.Optional(Type.String({ description: "Pagination token" })),
+  automatic_fields: Type.Optional(Type.Boolean()),
+  app_id: Type.Optional(Type.String({ description: "Feishu app id (optional if env provided)" })),
+  app_secret: Type.Optional(
+    Type.String({ description: "Feishu app secret (optional if env provided)" }),
+  ),
+});
+
 const ListAppRolesSchema = Type.Object({
   app_token: Type.String({ description: "Bitable app token" }),
   app_id: Type.Optional(Type.String({ description: "Feishu app id (optional if env provided)" })),
@@ -244,6 +342,278 @@ const plugin = {
           app_token: params.app_token,
           created_count: results.length,
           results,
+        };
+      },
+    });
+
+    api.registerTool<{
+      app_token: string;
+      page_size?: number;
+      page_token?: string;
+      app_id?: string;
+      app_secret?: string;
+    }>({
+      name: "feishu_custom_bitable_list_tables",
+      description: "List tables in a Bitable app",
+      parameters: ListTablesSchema,
+      async execute(ctxOrParams: any, rawParams?: any) {
+        const params = (ctxOrParams && typeof ctxOrParams === "object" && "params" in ctxOrParams
+          ? (ctxOrParams as any).params
+          : (rawParams ?? ctxOrParams)) as {
+          app_token: string;
+          page_size?: number;
+          page_token?: string;
+          app_id?: string;
+          app_secret?: string;
+        };
+        const client = getClient(params);
+        const res = await client.bitable.appTable.list({
+          path: { app_token: params.app_token },
+          params: {
+            ...(params.page_size !== undefined && { page_size: params.page_size }),
+            ...(params.page_token && { page_token: params.page_token }),
+          },
+        });
+        if (res.code !== 0) throw new Error(res.msg || "list tables failed");
+        const items = res.data?.items || [];
+        return {
+          app_token: params.app_token,
+          total: res.data?.total ?? items.length,
+          has_more: res.data?.has_more ?? false,
+          page_token: res.data?.page_token,
+          tables: items.map((t: any) => ({
+            table_id: t.table_id,
+            name: t.name,
+            revision: t.revision,
+          })),
+        };
+      },
+    });
+
+    api.registerTool<{
+      app_token: string;
+      table_id: string;
+      record_id: string;
+      app_id?: string;
+      app_secret?: string;
+    }>({
+      name: "feishu_custom_bitable_delete_record",
+      description: "Delete a record from a Bitable table",
+      parameters: DeleteRecordSchema,
+      async execute(ctxOrParams: any, rawParams?: any) {
+        const params = (ctxOrParams && typeof ctxOrParams === "object" && "params" in ctxOrParams
+          ? (ctxOrParams as any).params
+          : (rawParams ?? ctxOrParams)) as {
+          app_token: string;
+          table_id: string;
+          record_id: string;
+          app_id?: string;
+          app_secret?: string;
+        };
+        const client = getClient(params);
+        const res = await client.bitable.appTableRecord.delete({
+          path: {
+            app_token: params.app_token,
+            table_id: params.table_id,
+            record_id: params.record_id,
+          },
+        });
+        if (res.code !== 0) throw new Error(res.msg || "delete record failed");
+        return {
+          ok: res.data?.deleted ?? true,
+          app_token: params.app_token,
+          table_id: params.table_id,
+          record_id: res.data?.record_id || params.record_id,
+        };
+      },
+    });
+
+    api.registerTool<{
+      app_token: string;
+      table_id: string;
+      records: Array<{ fields: Record<string, unknown> }>;
+      user_id_type?: "user_id" | "union_id" | "open_id";
+      client_token?: string;
+      ignore_consistency_check?: boolean;
+      app_id?: string;
+      app_secret?: string;
+    }>({
+      name: "feishu_custom_bitable_batch_create_records",
+      description: "Create multiple records in a Bitable table",
+      parameters: BatchCreateRecordsSchema,
+      async execute(ctxOrParams: any, rawParams?: any) {
+        const params = (ctxOrParams && typeof ctxOrParams === "object" && "params" in ctxOrParams
+          ? (ctxOrParams as any).params
+          : (rawParams ?? ctxOrParams)) as {
+          app_token: string;
+          table_id: string;
+          records: Array<{ fields: Record<string, unknown> }>;
+          user_id_type?: "user_id" | "union_id" | "open_id";
+          client_token?: string;
+          ignore_consistency_check?: boolean;
+          app_id?: string;
+          app_secret?: string;
+        };
+        const client = getClient(params);
+        const res = await client.bitable.appTableRecord.batchCreate({
+          path: {
+            app_token: params.app_token,
+            table_id: params.table_id,
+          },
+          params: {
+            ...(params.user_id_type && { user_id_type: params.user_id_type }),
+            ...(params.client_token && { client_token: params.client_token }),
+            ...(params.ignore_consistency_check !== undefined && {
+              ignore_consistency_check: params.ignore_consistency_check,
+            }),
+          },
+          data: {
+            records: params.records.map((record) => ({
+              fields: record.fields as Record<string, any>,
+            })),
+          },
+        });
+        if (res.code !== 0) throw new Error(res.msg || "batch create records failed");
+        const items = res.data?.records || [];
+        return {
+          app_token: params.app_token,
+          table_id: params.table_id,
+          created_count: items.length,
+          records: items.map((record: any) => ({
+            record_id: record.record_id,
+            fields: record.fields,
+            record_url: record.record_url,
+          })),
+        };
+      },
+    });
+
+    api.registerTool<{
+      app_token: string;
+      table_id: string;
+      records: Array<{ record_id: string; fields: Record<string, unknown> }>;
+      user_id_type?: "user_id" | "union_id" | "open_id";
+      ignore_consistency_check?: boolean;
+      app_id?: string;
+      app_secret?: string;
+    }>({
+      name: "feishu_custom_bitable_batch_update_records",
+      description: "Update multiple records in a Bitable table",
+      parameters: BatchUpdateRecordsSchema,
+      async execute(ctxOrParams: any, rawParams?: any) {
+        const params = (ctxOrParams && typeof ctxOrParams === "object" && "params" in ctxOrParams
+          ? (ctxOrParams as any).params
+          : (rawParams ?? ctxOrParams)) as {
+          app_token: string;
+          table_id: string;
+          records: Array<{ record_id: string; fields: Record<string, unknown> }>;
+          user_id_type?: "user_id" | "union_id" | "open_id";
+          ignore_consistency_check?: boolean;
+          app_id?: string;
+          app_secret?: string;
+        };
+        const client = getClient(params);
+        const res = await client.bitable.appTableRecord.batchUpdate({
+          path: {
+            app_token: params.app_token,
+            table_id: params.table_id,
+          },
+          params: {
+            ...(params.user_id_type && { user_id_type: params.user_id_type }),
+            ...(params.ignore_consistency_check !== undefined && {
+              ignore_consistency_check: params.ignore_consistency_check,
+            }),
+          },
+          data: {
+            records: params.records.map((record) => ({
+              record_id: record.record_id,
+              fields: record.fields as Record<string, any>,
+            })),
+          },
+        });
+        if (res.code !== 0) throw new Error(res.msg || "batch update records failed");
+        const items = res.data?.records || [];
+        return {
+          app_token: params.app_token,
+          table_id: params.table_id,
+          updated_count: items.length,
+          records: items.map((record: any) => ({
+            record_id: record.record_id,
+            fields: record.fields,
+            record_url: record.record_url,
+          })),
+        };
+      },
+    });
+
+    api.registerTool<{
+      app_token: string;
+      table_id: string;
+      view_id?: string;
+      field_names?: string[];
+      sort?: Array<{ field_name?: string; desc?: boolean }>;
+      filter?: Record<string, unknown>;
+      user_id_type?: "user_id" | "union_id" | "open_id";
+      page_size?: number;
+      page_token?: string;
+      automatic_fields?: boolean;
+      app_id?: string;
+      app_secret?: string;
+    }>({
+      name: "feishu_custom_bitable_search_records",
+      description: "Search records in a Bitable table with structured filters",
+      parameters: SearchRecordsSchema,
+      async execute(ctxOrParams: any, rawParams?: any) {
+        const params = (ctxOrParams && typeof ctxOrParams === "object" && "params" in ctxOrParams
+          ? (ctxOrParams as any).params
+          : (rawParams ?? ctxOrParams)) as {
+          app_token: string;
+          table_id: string;
+          view_id?: string;
+          field_names?: string[];
+          sort?: Array<{ field_name?: string; desc?: boolean }>;
+          filter?: Record<string, unknown>;
+          user_id_type?: "user_id" | "union_id" | "open_id";
+          page_size?: number;
+          page_token?: string;
+          automatic_fields?: boolean;
+          app_id?: string;
+          app_secret?: string;
+        };
+        const client = getClient(params);
+        const res = await client.bitable.appTableRecord.search({
+          path: {
+            app_token: params.app_token,
+            table_id: params.table_id,
+          },
+          params: {
+            ...(params.user_id_type && { user_id_type: params.user_id_type }),
+            ...(params.page_size !== undefined && { page_size: params.page_size }),
+            ...(params.page_token && { page_token: params.page_token }),
+          },
+          data: {
+            ...(params.view_id && { view_id: params.view_id }),
+            ...(params.field_names && { field_names: params.field_names }),
+            ...(params.sort && { sort: params.sort }),
+            ...(params.filter && { filter: params.filter as Record<string, any> }),
+            ...(params.automatic_fields !== undefined && {
+              automatic_fields: params.automatic_fields,
+            }),
+          },
+        });
+        if (res.code !== 0) throw new Error(res.msg || "search records failed");
+        const items = res.data?.items || [];
+        return {
+          app_token: params.app_token,
+          table_id: params.table_id,
+          has_more: res.data?.has_more ?? false,
+          page_token: res.data?.page_token,
+          total: res.data?.total ?? items.length,
+          items: items.map((record: any) => ({
+            record_id: record.record_id,
+            fields: record.fields,
+            record_url: record.record_url,
+          })),
         };
       },
     });
@@ -498,7 +868,7 @@ const plugin = {
     });
 
     api.logger.info?.(
-      "feishu-custom: registered create_table/create_tables_batch + list_app_roles + create_app_role + add_role_member + perm_add_member",
+      "feishu-custom: registered table/record/role/permission tools",
     );
   },
 };
