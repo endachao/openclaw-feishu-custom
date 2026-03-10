@@ -1,6 +1,6 @@
 {
   "name": "openclaw-feishu-custom",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": false,
   "type": "module",
   "main": "index.ts",
@@ -10,7 +10,13 @@
     ]
   },
   "description": "OpenClaw plugin: Feishu Bitable table creation, role management, and permission sharing tools",
-  "keywords": ["openclaw", "openclaw-plugin", "feishu", "lark", "bitable"],
+  "keywords": [
+    "openclaw",
+    "openclaw-plugin",
+    "feishu",
+    "lark",
+    "bitable"
+  ],
   "repository": {
     "type": "git",
     "url": "https://github.com/endachao/openclaw-feishu-custom.git"
