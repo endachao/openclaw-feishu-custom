@@ -1,9 +1,14 @@
 {
-  "name": "feishu-custom-plugin",
+  "name": "feishu-custom",
   "version": "0.1.0",
   "private": false,
   "type": "module",
   "main": "index.ts",
+  "openclaw": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
   "description": "Custom OpenClaw Feishu extension with extra Bitable table-create tools",
   "license": "MIT",
   "dependencies": {
