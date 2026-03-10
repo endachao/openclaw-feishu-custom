@@ -1,5 +1,5 @@
 {
-  "name": "feishu-custom",
+  "name": "openclaw-feishu-custom",
   "version": "0.1.0",
   "private": false,
   "type": "module",
@@ -9,7 +9,13 @@
       "./index.ts"
     ]
   },
-  "description": "Custom OpenClaw Feishu extension with extra Bitable table-create tools",
+  "description": "OpenClaw plugin: Feishu Bitable table creation, role management, and permission sharing tools",
+  "keywords": ["openclaw", "openclaw-plugin", "feishu", "lark", "bitable"],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/endachao/openclaw-feishu-custom.git"
+  },
+  "author": "endachao",
   "license": "MIT",
   "dependencies": {
     "@larksuiteoapi/node-sdk": "^1.50.0",
