@@ -58,6 +58,16 @@ This plugin fills those gaps using Feishu's Open API and runs alongside the offi
 | `feishu_custom_bitable_list_role_members` | List collaborators in a custom role |
 | `feishu_custom_bitable_remove_role_member` | Remove a collaborator from a custom role |
 
+### View Management
+
+| Tool | Description |
+|------|-------------|
+| `feishu_custom_bitable_create_view` | Create a view |
+| `feishu_custom_bitable_list_views` | List views |
+| `feishu_custom_bitable_get_view` | Get a single view |
+| `feishu_custom_bitable_update_view` | Update a view |
+| `feishu_custom_bitable_delete_view` | Delete a view |
+
 ## Installation
 
 ### Option 1: Install directly from an OpenClaw chat

@@ -297,6 +297,71 @@ const RemoveAppRoleMemberSchema = Type.Object({
   ),
 });
 
+const CreateViewSchema = Type.Object({
+  app_token: Type.String({ description: "Bitable app token" }),
+  table_id: Type.String({ description: "Bitable table id" }),
+  view_name: Type.String({ description: "View name" }),
+  view_type: Type.Optional(
+    Type.Union([
+      Type.Literal("grid"),
+      Type.Literal("kanban"),
+      Type.Literal("gallery"),
+      Type.Literal("gantt"),
+      Type.Literal("form"),
+    ]),
+  ),
+  app_id: Type.Optional(Type.String({ description: "Feishu app id (optional if env provided)" })),
+  app_secret: Type.Optional(
+    Type.String({ description: "Feishu app secret (optional if env provided)" }),
+  ),
+});
+
+const ListViewsSchema = Type.Object({
+  app_token: Type.String({ description: "Bitable app token" }),
+  table_id: Type.String({ description: "Bitable table id" }),
+  page_size: Type.Optional(Type.Number({ description: "Page size" })),
+  page_token: Type.Optional(Type.String({ description: "Pagination token" })),
+  user_id_type: Type.Optional(
+    Type.Union([Type.Literal("user_id"), Type.Literal("union_id"), Type.Literal("open_id")]),
+  ),
+  app_id: Type.Optional(Type.String({ description: "Feishu app id (optional if env provided)" })),
+  app_secret: Type.Optional(
+    Type.String({ description: "Feishu app secret (optional if env provided)" }),
+  ),
+});
+
+const GetViewSchema = Type.Object({
+  app_token: Type.String({ description: "Bitable app token" }),
+  table_id: Type.String({ description: "Bitable table id" }),
+  view_id: Type.String({ description: "View id" }),
+  app_id: Type.Optional(Type.String({ description: "Feishu app id (optional if env provided)" })),
+  app_secret: Type.Optional(
+    Type.String({ description: "Feishu app secret (optional if env provided)" }),
+  ),
+});
+
+const UpdateViewSchema = Type.Object({
+  app_token: Type.String({ description: "Bitable app token" }),
+  table_id: Type.String({ description: "Bitable table id" }),
+  view_id: Type.String({ description: "View id" }),
+  view_name: Type.Optional(Type.String({ description: "New view name" })),
+  property: Type.Optional(Type.Record(Type.String(), Type.Any())),
+  app_id: Type.Optional(Type.String({ description: "Feishu app id (optional if env provided)" })),
+  app_secret: Type.Optional(
+    Type.String({ description: "Feishu app secret (optional if env provided)" }),
+  ),
+});
+
+const DeleteViewSchema = Type.Object({
+  app_token: Type.String({ description: "Bitable app token" }),
+  table_id: Type.String({ description: "Bitable table id" }),
+  view_id: Type.String({ description: "View id" }),
+  app_id: Type.Optional(Type.String({ description: "Feishu app id (optional if env provided)" })),
+  app_secret: Type.Optional(
+    Type.String({ description: "Feishu app secret (optional if env provided)" }),
+  ),
+});
+
 const ListAppRolesSchema = Type.Object({
   app_token: Type.String({ description: "Bitable app token" }),
   app_id: Type.Optional(Type.String({ description: "Feishu app id (optional if env provided)" })),
@@ -882,6 +947,217 @@ const plugin = {
           ok: true,
           app_token: params.app_token,
           table_id: params.table_id,
+        };
+      },
+    });
+
+    api.registerTool<{
+      app_token: string;
+      table_id: string;
+      view_name: string;
+      view_type?: "grid" | "kanban" | "gallery" | "gantt" | "form";
+      app_id?: string;
+      app_secret?: string;
+    }>({
+      name: "feishu_custom_bitable_create_view",
+      description: "Create a view in a Bitable table",
+      parameters: CreateViewSchema,
+      async execute(ctxOrParams: any, rawParams?: any) {
+        const params = (ctxOrParams && typeof ctxOrParams === "object" && "params" in ctxOrParams
+          ? (ctxOrParams as any).params
+          : (rawParams ?? ctxOrParams)) as {
+          app_token: string;
+          table_id: string;
+          view_name: string;
+          view_type?: "grid" | "kanban" | "gallery" | "gantt" | "form";
+          app_id?: string;
+          app_secret?: string;
+        };
+        const client = getClient(params);
+        const res = await client.bitable.appTableView.create({
+          path: {
+            app_token: params.app_token,
+            table_id: params.table_id,
+          },
+          data: {
+            view_name: params.view_name,
+            ...(params.view_type && { view_type: params.view_type }),
+          },
+        });
+        if (res.code !== 0) throwFeishuError(res, "create view failed");
+        return {
+          app_token: params.app_token,
+          table_id: params.table_id,
+          view: res.data?.view,
+        };
+      },
+    });
+
+    api.registerTool<{
+      app_token: string;
+      table_id: string;
+      page_size?: number;
+      page_token?: string;
+      user_id_type?: "user_id" | "union_id" | "open_id";
+      app_id?: string;
+      app_secret?: string;
+    }>({
+      name: "feishu_custom_bitable_list_views",
+      description: "List views in a Bitable table",
+      parameters: ListViewsSchema,
+      async execute(ctxOrParams: any, rawParams?: any) {
+        const params = (ctxOrParams && typeof ctxOrParams === "object" && "params" in ctxOrParams
+          ? (ctxOrParams as any).params
+          : (rawParams ?? ctxOrParams)) as {
+          app_token: string;
+          table_id: string;
+          page_size?: number;
+          page_token?: string;
+          user_id_type?: "user_id" | "union_id" | "open_id";
+          app_id?: string;
+          app_secret?: string;
+        };
+        const client = getClient(params);
+        const res = await client.bitable.appTableView.list({
+          path: {
+            app_token: params.app_token,
+            table_id: params.table_id,
+          },
+          params: {
+            ...(params.page_size !== undefined && { page_size: params.page_size }),
+            ...(params.page_token && { page_token: params.page_token }),
+            ...(params.user_id_type && { user_id_type: params.user_id_type }),
+          },
+        });
+        if (res.code !== 0) throwFeishuError(res, "list views failed");
+        const items = res.data?.items || [];
+        return {
+          app_token: params.app_token,
+          table_id: params.table_id,
+          total: res.data?.total ?? items.length,
+          has_more: res.data?.has_more ?? false,
+          page_token: res.data?.page_token,
+          views: items,
+        };
+      },
+    });
+
+    api.registerTool<{
+      app_token: string;
+      table_id: string;
+      view_id: string;
+      app_id?: string;
+      app_secret?: string;
+    }>({
+      name: "feishu_custom_bitable_get_view",
+      description: "Get a view from a Bitable table",
+      parameters: GetViewSchema,
+      async execute(ctxOrParams: any, rawParams?: any) {
+        const params = (ctxOrParams && typeof ctxOrParams === "object" && "params" in ctxOrParams
+          ? (ctxOrParams as any).params
+          : (rawParams ?? ctxOrParams)) as {
+          app_token: string;
+          table_id: string;
+          view_id: string;
+          app_id?: string;
+          app_secret?: string;
+        };
+        const client = getClient(params);
+        const res = await client.bitable.appTableView.get({
+          path: {
+            app_token: params.app_token,
+            table_id: params.table_id,
+            view_id: params.view_id,
+          },
+        });
+        if (res.code !== 0) throwFeishuError(res, "get view failed");
+        return {
+          app_token: params.app_token,
+          table_id: params.table_id,
+          view: res.data?.view,
+        };
+      },
+    });
+
+    api.registerTool<{
+      app_token: string;
+      table_id: string;
+      view_id: string;
+      view_name?: string;
+      property?: Record<string, unknown>;
+      app_id?: string;
+      app_secret?: string;
+    }>({
+      name: "feishu_custom_bitable_update_view",
+      description: "Update a view in a Bitable table",
+      parameters: UpdateViewSchema,
+      async execute(ctxOrParams: any, rawParams?: any) {
+        const params = (ctxOrParams && typeof ctxOrParams === "object" && "params" in ctxOrParams
+          ? (ctxOrParams as any).params
+          : (rawParams ?? ctxOrParams)) as {
+          app_token: string;
+          table_id: string;
+          view_id: string;
+          view_name?: string;
+          property?: Record<string, unknown>;
+          app_id?: string;
+          app_secret?: string;
+        };
+        const client = getClient(params);
+        const res = await client.bitable.appTableView.patch({
+          path: {
+            app_token: params.app_token,
+            table_id: params.table_id,
+            view_id: params.view_id,
+          },
+          data: {
+            ...(params.view_name && { view_name: params.view_name }),
+            ...(params.property && { property: params.property as Record<string, any> }),
+          },
+        });
+        if (res.code !== 0) throwFeishuError(res, "update view failed");
+        return {
+          app_token: params.app_token,
+          table_id: params.table_id,
+          view: res.data?.view,
+        };
+      },
+    });
+
+    api.registerTool<{
+      app_token: string;
+      table_id: string;
+      view_id: string;
+      app_id?: string;
+      app_secret?: string;
+    }>({
+      name: "feishu_custom_bitable_delete_view",
+      description: "Delete a view from a Bitable table",
+      parameters: DeleteViewSchema,
+      async execute(ctxOrParams: any, rawParams?: any) {
+        const params = (ctxOrParams && typeof ctxOrParams === "object" && "params" in ctxOrParams
+          ? (ctxOrParams as any).params
+          : (rawParams ?? ctxOrParams)) as {
+          app_token: string;
+          table_id: string;
+          view_id: string;
+          app_id?: string;
+          app_secret?: string;
+        };
+        const client = getClient(params);
+        const res = await client.bitable.appTableView.delete({
+          path: {
+            app_token: params.app_token,
+            table_id: params.table_id,
+            view_id: params.view_id,
+          },
+        });
+        if (res.code !== 0) throwFeishuError(res, "delete view failed");
+        return {
+          ok: true,
+          app_token: params.app_token,
+          table_id: params.table_id,
+          view_id: params.view_id,
         };
       },
     });
