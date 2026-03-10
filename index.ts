@@ -362,6 +362,105 @@ const DeleteViewSchema = Type.Object({
   ),
 });
 
+const GetFormSchema = Type.Object({
+  app_token: Type.String({ description: "Bitable app token" }),
+  table_id: Type.String({ description: "Bitable table id" }),
+  form_id: Type.String({ description: "Form id" }),
+  app_id: Type.Optional(Type.String({ description: "Feishu app id (optional if env provided)" })),
+  app_secret: Type.Optional(
+    Type.String({ description: "Feishu app secret (optional if env provided)" }),
+  ),
+});
+
+const UpdateFormSchema = Type.Object({
+  app_token: Type.String({ description: "Bitable app token" }),
+  table_id: Type.String({ description: "Bitable table id" }),
+  form_id: Type.String({ description: "Form id" }),
+  name: Type.Optional(Type.String()),
+  description: Type.Optional(Type.String()),
+  shared: Type.Optional(Type.Boolean()),
+  shared_limit: Type.Optional(
+    Type.Union([
+      Type.Literal("off"),
+      Type.Literal("tenant_editable"),
+      Type.Literal("anyone_editable"),
+    ]),
+  ),
+  submit_limit_once: Type.Optional(Type.Boolean()),
+  app_id: Type.Optional(Type.String({ description: "Feishu app id (optional if env provided)" })),
+  app_secret: Type.Optional(
+    Type.String({ description: "Feishu app secret (optional if env provided)" }),
+  ),
+});
+
+const ListFormFieldsSchema = Type.Object({
+  app_token: Type.String({ description: "Bitable app token" }),
+  table_id: Type.String({ description: "Bitable table id" }),
+  form_id: Type.String({ description: "Form id" }),
+  page_size: Type.Optional(Type.Number({ description: "Page size" })),
+  page_token: Type.Optional(Type.String({ description: "Pagination token" })),
+  app_id: Type.Optional(Type.String({ description: "Feishu app id (optional if env provided)" })),
+  app_secret: Type.Optional(
+    Type.String({ description: "Feishu app secret (optional if env provided)" }),
+  ),
+});
+
+const UpdateFormFieldSchema = Type.Object({
+  app_token: Type.String({ description: "Bitable app token" }),
+  table_id: Type.String({ description: "Bitable table id" }),
+  form_id: Type.String({ description: "Form id" }),
+  field_id: Type.String({ description: "Field id in form" }),
+  pre_field_id: Type.Optional(Type.String({ description: "Optional field id to place before" })),
+  title: Type.Optional(Type.String()),
+  description: Type.Optional(Type.String()),
+  required: Type.Optional(Type.Boolean()),
+  visible: Type.Optional(Type.Boolean()),
+  app_id: Type.Optional(Type.String({ description: "Feishu app id (optional if env provided)" })),
+  app_secret: Type.Optional(
+    Type.String({ description: "Feishu app secret (optional if env provided)" }),
+  ),
+});
+
+const ListDashboardsSchema = Type.Object({
+  app_token: Type.String({ description: "Bitable app token" }),
+  page_size: Type.Optional(Type.Number({ description: "Page size" })),
+  page_token: Type.Optional(Type.String({ description: "Pagination token" })),
+  app_id: Type.Optional(Type.String({ description: "Feishu app id (optional if env provided)" })),
+  app_secret: Type.Optional(
+    Type.String({ description: "Feishu app secret (optional if env provided)" }),
+  ),
+});
+
+const CopyDashboardSchema = Type.Object({
+  app_token: Type.String({ description: "Bitable app token" }),
+  block_id: Type.String({ description: "Dashboard block id" }),
+  name: Type.String({ description: "New dashboard name" }),
+  app_id: Type.Optional(Type.String({ description: "Feishu app id (optional if env provided)" })),
+  app_secret: Type.Optional(
+    Type.String({ description: "Feishu app secret (optional if env provided)" }),
+  ),
+});
+
+const ListWorkflowsSchema = Type.Object({
+  app_token: Type.String({ description: "Bitable app token" }),
+  page_size: Type.Optional(Type.Number({ description: "Page size" })),
+  page_token: Type.Optional(Type.String({ description: "Pagination token" })),
+  app_id: Type.Optional(Type.String({ description: "Feishu app id (optional if env provided)" })),
+  app_secret: Type.Optional(
+    Type.String({ description: "Feishu app secret (optional if env provided)" }),
+  ),
+});
+
+const UpdateWorkflowSchema = Type.Object({
+  app_token: Type.String({ description: "Bitable app token" }),
+  workflow_id: Type.String({ description: "Workflow id" }),
+  status: Type.String({ description: "Workflow status" }),
+  app_id: Type.Optional(Type.String({ description: "Feishu app id (optional if env provided)" })),
+  app_secret: Type.Optional(
+    Type.String({ description: "Feishu app secret (optional if env provided)" }),
+  ),
+});
+
 const ListAppRolesSchema = Type.Object({
   app_token: Type.String({ description: "Bitable app token" }),
   app_id: Type.Optional(Type.String({ description: "Feishu app id (optional if env provided)" })),
@@ -1158,6 +1257,358 @@ const plugin = {
           app_token: params.app_token,
           table_id: params.table_id,
           view_id: params.view_id,
+        };
+      },
+    });
+
+    api.registerTool<{
+      app_token: string;
+      table_id: string;
+      form_id: string;
+      app_id?: string;
+      app_secret?: string;
+    }>({
+      name: "feishu_custom_bitable_get_form",
+      description: "Get form metadata from a Bitable table",
+      parameters: GetFormSchema,
+      async execute(ctxOrParams: any, rawParams?: any) {
+        const params = (ctxOrParams && typeof ctxOrParams === "object" && "params" in ctxOrParams
+          ? (ctxOrParams as any).params
+          : (rawParams ?? ctxOrParams)) as {
+          app_token: string;
+          table_id: string;
+          form_id: string;
+          app_id?: string;
+          app_secret?: string;
+        };
+        const client = getClient(params);
+        const res = await client.bitable.appTableForm.get({
+          path: {
+            app_token: params.app_token,
+            table_id: params.table_id,
+            form_id: params.form_id,
+          },
+        });
+        if (res.code !== 0) throwFeishuError(res, "get form failed");
+        return {
+          app_token: params.app_token,
+          table_id: params.table_id,
+          form_id: params.form_id,
+          form: res.data?.form,
+        };
+      },
+    });
+
+    api.registerTool<{
+      app_token: string;
+      table_id: string;
+      form_id: string;
+      name?: string;
+      description?: string;
+      shared?: boolean;
+      shared_limit?: "off" | "tenant_editable" | "anyone_editable";
+      submit_limit_once?: boolean;
+      app_id?: string;
+      app_secret?: string;
+    }>({
+      name: "feishu_custom_bitable_update_form",
+      description: "Update form metadata in a Bitable table",
+      parameters: UpdateFormSchema,
+      async execute(ctxOrParams: any, rawParams?: any) {
+        const params = (ctxOrParams && typeof ctxOrParams === "object" && "params" in ctxOrParams
+          ? (ctxOrParams as any).params
+          : (rawParams ?? ctxOrParams)) as {
+          app_token: string;
+          table_id: string;
+          form_id: string;
+          name?: string;
+          description?: string;
+          shared?: boolean;
+          shared_limit?: "off" | "tenant_editable" | "anyone_editable";
+          submit_limit_once?: boolean;
+          app_id?: string;
+          app_secret?: string;
+        };
+        const client = getClient(params);
+        const res = await client.bitable.appTableForm.patch({
+          path: {
+            app_token: params.app_token,
+            table_id: params.table_id,
+            form_id: params.form_id,
+          },
+          data: {
+            ...(params.name !== undefined && { name: params.name }),
+            ...(params.description !== undefined && { description: params.description }),
+            ...(params.shared !== undefined && { shared: params.shared }),
+            ...(params.shared_limit !== undefined && { shared_limit: params.shared_limit }),
+            ...(params.submit_limit_once !== undefined && {
+              submit_limit_once: params.submit_limit_once,
+            }),
+          },
+        });
+        if (res.code !== 0) throwFeishuError(res, "update form failed");
+        return {
+          app_token: params.app_token,
+          table_id: params.table_id,
+          form_id: params.form_id,
+          form: res.data?.form,
+        };
+      },
+    });
+
+    api.registerTool<{
+      app_token: string;
+      table_id: string;
+      form_id: string;
+      page_size?: number;
+      page_token?: string;
+      app_id?: string;
+      app_secret?: string;
+    }>({
+      name: "feishu_custom_bitable_list_form_fields",
+      description: "List form fields in a Bitable form",
+      parameters: ListFormFieldsSchema,
+      async execute(ctxOrParams: any, rawParams?: any) {
+        const params = (ctxOrParams && typeof ctxOrParams === "object" && "params" in ctxOrParams
+          ? (ctxOrParams as any).params
+          : (rawParams ?? ctxOrParams)) as {
+          app_token: string;
+          table_id: string;
+          form_id: string;
+          page_size?: number;
+          page_token?: string;
+          app_id?: string;
+          app_secret?: string;
+        };
+        const client = getClient(params);
+        const res = await client.bitable.appTableFormField.list({
+          path: {
+            app_token: params.app_token,
+            table_id: params.table_id,
+            form_id: params.form_id,
+          },
+          params: {
+            ...(params.page_size !== undefined && { page_size: params.page_size }),
+            ...(params.page_token !== undefined && { page_token: params.page_token }),
+          },
+        });
+        if (res.code !== 0) throwFeishuError(res, "list form fields failed");
+        return {
+          app_token: params.app_token,
+          table_id: params.table_id,
+          form_id: params.form_id,
+          total: res.data?.total,
+          has_more: res.data?.has_more,
+          page_token: res.data?.page_token,
+          items: res.data?.items || [],
+        };
+      },
+    });
+
+    api.registerTool<{
+      app_token: string;
+      table_id: string;
+      form_id: string;
+      field_id: string;
+      pre_field_id?: string;
+      title?: string;
+      description?: string;
+      required?: boolean;
+      visible?: boolean;
+      app_id?: string;
+      app_secret?: string;
+    }>({
+      name: "feishu_custom_bitable_update_form_field",
+      description: "Update a form field in a Bitable form",
+      parameters: UpdateFormFieldSchema,
+      async execute(ctxOrParams: any, rawParams?: any) {
+        const params = (ctxOrParams && typeof ctxOrParams === "object" && "params" in ctxOrParams
+          ? (ctxOrParams as any).params
+          : (rawParams ?? ctxOrParams)) as {
+          app_token: string;
+          table_id: string;
+          form_id: string;
+          field_id: string;
+          pre_field_id?: string;
+          title?: string;
+          description?: string;
+          required?: boolean;
+          visible?: boolean;
+          app_id?: string;
+          app_secret?: string;
+        };
+        const client = getClient(params);
+        const res = await client.bitable.appTableFormField.patch({
+          path: {
+            app_token: params.app_token,
+            table_id: params.table_id,
+            form_id: params.form_id,
+            field_id: params.field_id,
+          },
+          data: {
+            ...(params.pre_field_id !== undefined && { pre_field_id: params.pre_field_id }),
+            ...(params.title !== undefined && { title: params.title }),
+            ...(params.description !== undefined && { description: params.description }),
+            ...(params.required !== undefined && { required: params.required }),
+            ...(params.visible !== undefined && { visible: params.visible }),
+          },
+        });
+        if (res.code !== 0) throwFeishuError(res, "update form field failed");
+        return {
+          app_token: params.app_token,
+          table_id: params.table_id,
+          form_id: params.form_id,
+          field_id: params.field_id,
+          field: res.data?.field,
+        };
+      },
+    });
+
+    api.registerTool<{
+      app_token: string;
+      page_size?: number;
+      page_token?: string;
+      app_id?: string;
+      app_secret?: string;
+    }>({
+      name: "feishu_custom_bitable_list_dashboards",
+      description: "List dashboards in a Bitable app",
+      parameters: ListDashboardsSchema,
+      async execute(ctxOrParams: any, rawParams?: any) {
+        const params = (ctxOrParams && typeof ctxOrParams === "object" && "params" in ctxOrParams
+          ? (ctxOrParams as any).params
+          : (rawParams ?? ctxOrParams)) as {
+          app_token: string;
+          page_size?: number;
+          page_token?: string;
+          app_id?: string;
+          app_secret?: string;
+        };
+        const client = getClient(params);
+        const res = await client.bitable.appDashboard.list({
+          path: { app_token: params.app_token },
+          params: {
+            ...(params.page_size !== undefined && { page_size: params.page_size }),
+            ...(params.page_token !== undefined && { page_token: params.page_token }),
+          },
+        });
+        if (res.code !== 0) throwFeishuError(res, "list dashboards failed");
+        return {
+          app_token: params.app_token,
+          dashboards: res.data?.dashboards || [],
+          page_token: res.data?.page_token,
+          has_more: res.data?.has_more,
+        };
+      },
+    });
+
+    api.registerTool<{
+      app_token: string;
+      block_id: string;
+      name: string;
+      app_id?: string;
+      app_secret?: string;
+    }>({
+      name: "feishu_custom_bitable_copy_dashboard",
+      description: "Copy a dashboard in a Bitable app",
+      parameters: CopyDashboardSchema,
+      async execute(ctxOrParams: any, rawParams?: any) {
+        const params = (ctxOrParams && typeof ctxOrParams === "object" && "params" in ctxOrParams
+          ? (ctxOrParams as any).params
+          : (rawParams ?? ctxOrParams)) as {
+          app_token: string;
+          block_id: string;
+          name: string;
+          app_id?: string;
+          app_secret?: string;
+        };
+        const client = getClient(params);
+        const res = await client.bitable.appDashboard.copy({
+          path: {
+            app_token: params.app_token,
+            block_id: params.block_id,
+          },
+          data: { name: params.name },
+        });
+        if (res.code !== 0) throwFeishuError(res, "copy dashboard failed");
+        return {
+          app_token: params.app_token,
+          block_id: res.data?.block_id,
+          name: res.data?.name,
+        };
+      },
+    });
+
+    api.registerTool<{
+      app_token: string;
+      page_size?: number;
+      page_token?: string;
+      app_id?: string;
+      app_secret?: string;
+    }>({
+      name: "feishu_custom_bitable_list_workflows",
+      description: "List workflows in a Bitable app",
+      parameters: ListWorkflowsSchema,
+      async execute(ctxOrParams: any, rawParams?: any) {
+        const params = (ctxOrParams && typeof ctxOrParams === "object" && "params" in ctxOrParams
+          ? (ctxOrParams as any).params
+          : (rawParams ?? ctxOrParams)) as {
+          app_token: string;
+          page_size?: number;
+          page_token?: string;
+          app_id?: string;
+          app_secret?: string;
+        };
+        const client = getClient(params);
+        const res = await client.bitable.appWorkflow.list({
+          path: { app_token: params.app_token },
+          params: {
+            ...(params.page_size !== undefined && { page_size: params.page_size }),
+            ...(params.page_token !== undefined && { page_token: params.page_token }),
+          },
+        });
+        if (res.code !== 0) throwFeishuError(res, "list workflows failed");
+        return {
+          app_token: params.app_token,
+          workflows: res.data?.workflows || [],
+        };
+      },
+    });
+
+    api.registerTool<{
+      app_token: string;
+      workflow_id: string;
+      status: string;
+      app_id?: string;
+      app_secret?: string;
+    }>({
+      name: "feishu_custom_bitable_update_workflow",
+      description: "Update workflow status in a Bitable app",
+      parameters: UpdateWorkflowSchema,
+      async execute(ctxOrParams: any, rawParams?: any) {
+        const params = (ctxOrParams && typeof ctxOrParams === "object" && "params" in ctxOrParams
+          ? (ctxOrParams as any).params
+          : (rawParams ?? ctxOrParams)) as {
+          app_token: string;
+          workflow_id: string;
+          status: string;
+          app_id?: string;
+          app_secret?: string;
+        };
+        const client = getClient(params);
+        const res = await client.bitable.appWorkflow.update({
+          path: {
+            app_token: params.app_token,
+            workflow_id: params.workflow_id,
+          },
+          data: { status: params.status },
+        });
+        if (res.code !== 0) throwFeishuError(res, "update workflow failed");
+        return {
+          ok: true,
+          app_token: params.app_token,
+          workflow_id: params.workflow_id,
+          status: params.status,
         };
       },
     });

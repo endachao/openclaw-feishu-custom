@@ -68,6 +68,24 @@ This plugin fills those gaps using Feishu's Open API and runs alongside the offi
 | `feishu_custom_bitable_update_view` | Update a view |
 | `feishu_custom_bitable_delete_view` | Delete a view |
 
+### Form Management
+
+| Tool | Description |
+|------|-------------|
+| `feishu_custom_bitable_get_form` | Get form metadata |
+| `feishu_custom_bitable_update_form` | Update form metadata |
+| `feishu_custom_bitable_list_form_fields` | List form fields |
+| `feishu_custom_bitable_update_form_field` | Update a form field |
+
+### Dashboards & Workflows
+
+| Tool | Description |
+|------|-------------|
+| `feishu_custom_bitable_list_dashboards` | List dashboards |
+| `feishu_custom_bitable_copy_dashboard` | Copy a dashboard |
+| `feishu_custom_bitable_list_workflows` | List workflows |
+| `feishu_custom_bitable_update_workflow` | Update workflow status |
+
 ## Installation
 
 ### Option 1: Install directly from an OpenClaw chat
